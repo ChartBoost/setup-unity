@@ -57,10 +57,10 @@ async function installUnityHub() {
         unityHubPath = '/Applications/Unity Hub.app/Contents/MacOS/Unity Hub';
         if (!fs.existsSync(unityHubPath)) {
             const installerPath = await tc.downloadTool('https://public-cdn.cloud.unity3d.com/hub/prod/UnityHubSetup.dmg');
-            await execute(`sudo hdiutil mount "${installerPath}"`);
+            await execute(`hdiutil mount "${installerPath}"`);
             const hubVolume = (await execute('ls /Volumes')).match(/Unity Hub.*/)[0];
             await execute(`ditto "/Volumes/${hubVolume}/Unity Hub.app" "/Applications/Unity Hub.app"`);
-            await execute(`sudo hdiutil detach "/Volumes/${hubVolume}"`);
+            await execute(`hdiutil detach "/Volumes/${hubVolume}"`);
             await execute(`rm "${installerPath}"`);
         }
 
@@ -83,8 +83,8 @@ async function installUnityEditor(unityHubPath, installPath, unityVersion, unity
     if (!unityPath) {
         if (installPath) {
             if (process.platform === 'linux' || process.platform === 'darwin') {
-                await execute(`sudo mkdir -p "${installPath}"`);
-                await execute(`sudo chmod -R o+rwx "${installPath}"`);
+                await execute(`echo ${process.env.SETUP_PASS} | sudo -S mkdir -p "${installPath}"`);
+                await execute(`echo ${process.env.SETUP_PASS} | sudo -S chmod -R o+rwx "${installPath}"`);
             }
             await executeHub(unityHubPath, `install-path --set "${installPath}"`);
         }
@@ -108,15 +108,16 @@ async function installUnityModules(unityHubPath, unityVersion, unityModules, uni
 
 async function postInstall() {
     if (process.platform === 'darwin') {
-        await execute('sudo mkdir -p "/Library/Application Support/Unity"');
-        await execute(`sudo chown -R ${process.env.USER} "/Library/Application Support/Unity"`);
+        await execute(`echo ${process.env.SETUP_PASS} | sudo -S mkdir -p "/Library/Application Support/Unity"`);
+        await execute(`echo ${process.env.SETUP_PASS} | sudo -S chown -R ${process.env.USER} "/Library/Application Support/Unity"`);
     }
 }
 
 async function findUnity(unityHubPath, unityVersion) {
     let unityPath = '';
-    const output = await executeHub(unityHubPath, `editors --installed`);
-    const match = output.match(new RegExp(`${unityVersion} , installed at (.+)`));
+    let output = await executeHub(unityHubPath, `editors --installed`);
+    output = output.replace("(Intel)", "");
+    let match = output.match(new RegExp(`${unityVersion}(.+)`));
     if (match) {
         unityPath = match[1];
         if (unityPath && process.platform === 'darwin') {
@@ -206,4 +207,3 @@ function getInputAsBool(name, options) {
 }
 
 run();
-
